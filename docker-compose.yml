@@ -1,0 +1,55 @@
+services:
+  # 1. FastAPI Core Backend Service
+  border-ai-backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - POSTGRES_URL=postgresql://bsf:border_ai_2025@postgres:5432/border_vision
+    depends_on:
+      - redis
+      - postgres
+      - kafka
+
+  # 2. Redis Hot Watchlist Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  # 3. PostgreSQL + TimescaleDB Metadata & Event Log
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=bsf
+      - POSTGRES_PASSWORD=border_ai_2025
+      - POSTGRES_DB=border_vision
+
+  # 4. Redpanda / Apache Kafka Event Bus
+  kafka:
+    image: docker.redpanda.com/redpandadata/redpanda:v23.2.1
+    ports:
+      - "9092:9092"
+    command:
+      - redpanda start
+      - --smp 1
+      - --memory 1G
+      - --reserve-memory 0M
+      - --overprovisioned
+      - --node-id 0
+
+  # 5. MinIO S3 Object Store for Face & Plate Crops
+  minio:
+    image: quay.io/minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=bsf_admin
+      - MINIO_ROOT_PASSWORD=border_ai_2025
+    command: server /data --console-address ":9001"
